@@ -1,4 +1,4 @@
-import streamlit as st
+     import streamlit as st
 import datetime
 import io
 import math
@@ -16,6 +16,7 @@ st.set_page_config(
     layout="wide"
 )
 
+# Estilos CSS
 st.markdown("""
 <style>
     .main-header {
@@ -51,23 +52,17 @@ st.markdown("""
 st.markdown('<div class="main-header">📦 Generador Oficial de Cotizaciones | Mail Boxes Etc.</div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# FUNCIONES PARA LEER EXCEL Y CONSULTAR TARIFAS
+# CARGA DE DATOS EXCEL
 # ---------------------------------------------------------
 @st.cache_data
 def cargar_cotizadores():
     try:
         excel_expo = pd.ExcelFile("Cotizador Expo 2026 (1).xlsx")
-        excel_impo = pd.ExcelFile("Cotizador Impo 2026 (1).xlsx")
-        
         df_areas_expo = pd.read_excel(excel_expo, sheet_name="Areas")
-        df_fedex_expo = pd.read_excel(excel_expo, sheet_name="FedEx")
-        df_ups_expo = pd.read_excel(excel_expo, sheet_name="UPS")
         
         return {
             "status": True,
-            "areas_expo": df_areas_expo,
-            "fedex_expo": df_fedex_expo,
-            "ups_expo": df_ups_expo
+            "areas_expo": df_areas_expo
         }
     except Exception as e:
         return {"status": False, "error": str(e)}
@@ -79,10 +74,12 @@ def obtener_paises():
         df = cotiz_data["areas_expo"]
         paises = df.iloc[1:, 1].dropna().unique().tolist()
         return sorted([str(p).strip() for p in paises])
-    return ["Brasil", "Estados Unidos", "España", "Uruguay", "Chile", "Alemania"]
+    return ["Argentina", "Brasil", "Estados Unidos", "España", "Uruguay", "Chile", "Alemania"]
+
+lista_paises = obtener_paises()
 
 # ---------------------------------------------------------
-# FORMULARIO DE ENTRADA
+# FORMULARIO Y CONTROLES DE COTIZACIÓN
 # ---------------------------------------------------------
 with st.form("cotizacion_form"):
     col_tipo, col_dates1, col_dates2 = st.columns([1, 1, 1])
@@ -100,15 +97,21 @@ with st.form("cotizacion_form"):
         st.subheader("Remitente (Origen)")
         rem_nombre = st.text_input("Nombre / Razón Social Remitente", value="JOSEFINA ESTRELLA")
         rem_cuit = st.text_input("CUIT / DNI Remitente", value="27-16920864-1")
-        rem_direccion = st.text_input("Dirección Remitente", value="Arenales 1172, CABA (C1061AAJ)")
+        rem_direccion = st.text_input("Dirección Remitente", value="Arenales 1172, CABA")
+        rem_cp = st.text_input("Código Postal Origen", value="C1061AAJ")
         rem_pais = st.text_input("País Origen", value="Argentina")
 
-    lista_paises = obtener_paises()
     with col2:
         st.subheader("Destinatario (Destino)")
         dest_nombre = st.text_input("Nombre Destinatario", value="Renata María Moreira de Jager")
-        dest_direccion = st.text_input("Dirección Destinatario", value="Rua 30 de Novembro 739, Castro")
-        dest_estado_cp = st.text_input("Estado / Código Postal", value="Paraná (CP 84177-022)")
+        dest_direccion = st.text_input("Dirección / Calle Destinatario", value="Rua 30 de Novembro 739, Castro")
+        
+        col_cp1, col_cp2 = st.columns([2, 1])
+        with col_cp1:
+            dest_estado = st.text_input("Estado / Provincia", value="Paraná")
+        with col_cp2:
+            dest_cp = st.text_input("Código Postal (CP)", value="84177-022", help="Escribe o verifica el código postal según la dirección.")
+            
         dest_pais = st.selectbox("País Destino", options=lista_paises, index=lista_paises.index("Brasil") if "Brasil" in lista_paises else 0)
 
     st.markdown('<div class="sub-header">2. Detalle de Carga</div>', unsafe_allow_html=True)
@@ -124,28 +127,67 @@ with st.form("cotizacion_form"):
         peso_real = st.number_input("Peso Real (kg)", value=0.365, step=0.05, format="%.3f")
         factor_div = st.selectbox("Factor Volumétrico", [5000, 6000], index=0)
 
-    # Cálculos de Peso
+    # Cálculo de Peso
     peso_vol = (largo * ancho * alto) / factor_div
     peso_facturable_calc = max(peso_real, peso_vol)
     peso_facturable = math.ceil(peso_facturable_calc * 2) / 2
 
     st.info(f"**Cálculo Automático:** Peso Volumétrico: **{peso_vol:.3f} kg** | Peso Facturable Aplicado: **{peso_facturable} kg**")
 
-    st.markdown('<div class="sub-header">3. Tarifas de Servicios (USD)</div>', unsafe_allow_html=True)
-    col6, col7, col8, col9 = st.columns(4)
-    with col6:
-        precio_connect = st.number_input("CONNECT PLUS (USD)", value=50.0, step=1.0)
-    with col7:
-        precio_ups = st.number_input("UPS (USD)", value=75.0, step=1.0)
-    with col8:
-        precio_fedex = st.number_input("FEDEX (USD)", value=80.0, step=1.0)
-    with col9:
-        precio_priority = st.number_input("PRIORITY (USD)", value=85.0, step=1.0)
+    # ---------------------------------------------------------
+    # SECCIÓN 3: MARGEN DE GANANCIA Y PRECIOS DE COSTO
+    # ---------------------------------------------------------
+    st.markdown('<div class="sub-header">3. Tarifas Base (Costo) y Margen de Ganancia</div>', unsafe_allow_html=True)
+    
+    col_m1, col_m2 = st.columns([1, 2])
+    with col_m1:
+        margen_porcentaje = st.number_input("Margen de Ganancia (%)", value=30.0, min_value=0.0, max_value=200.0, step=5.0)
+    
+    factor_margen = 1 + (margen_porcentaje / 100.0)
+
+    st.write("**Ingresa los costos base (los precios finales con margen se calcularán automáticamente):**")
+    
+    col_c1, col_c2, col_c3, col_c4 = st.columns(4)
+    with col_c1:
+        costo_connect = st.number_input("Costo Connect Plus (USD)", value=38.5)
+        precio_connect = round(costo_connect * factor_margen, 2)
+        st.caption(f"Precio Venta: **USD {precio_connect}**")
+
+    with col_c2:
+        costo_ups = st.number_input("Costo UPS (USD)", value=57.6)
+        precio_ups = round(costo_ups * factor_margen, 2)
+        st.caption(f"Precio Venta: **USD {precio_ups}**")
+
+    with col_c3:
+        costo_fedex = st.number_input("Costo FedEx (USD)", value=61.5)
+        precio_fedex = round(costo_fedex * factor_margen, 2)
+        st.caption(f"Precio Venta: **USD {precio_fedex}**")
+
+    with col_c4:
+        costo_priority = st.number_input("Costo Priority (USD)", value=65.0)
+        precio_priority = round(costo_priority * factor_margen, 2)
+        st.caption(f"Precio Venta: **USD {precio_priority}**")
+
+    # ---------------------------------------------------------
+    # SECCIÓN 4: SELECCIÓN DE SERVICIOS VISIBLES EN EL PDF
+    # ---------------------------------------------------------
+    st.markdown('<div class="sub-header">4. Configurar Servicios Visibles en el PDF</div>', unsafe_allow_html=True)
+    st.write("Selecciona cuáles servicios deseas mostrar en la tabla comparativa del cliente:")
+    
+    col_v1, col_v2, col_v3, col_v4 = st.columns(4)
+    with col_v1:
+        ver_connect = st.checkbox("Mostrar CONNECT PLUS", value=True)
+    with col_v2:
+        ver_ups = st.checkbox("Mostrar UPS", value=True)
+    with col_v3:
+        ver_fedex = st.checkbox("Mostrar FEDEX", value=True)
+    with col_v4:
+        ver_priority = st.checkbox("Mostrar PRIORITY", value=True)
 
     submitted = st.form_submit_button("📄 GENERAR PDF DE COTIZACIÓN")
 
 # ---------------------------------------------------------
-# GENERACIÓN DE PDF
+# GENERACIÓN DE PDF REPORTLAB
 # ---------------------------------------------------------
 def generar_pdf_reportlab():
     buffer = io.BytesIO()
@@ -175,14 +217,21 @@ def generar_pdf_reportlab():
     elements = []
     fecha_str = fecha_emision.strftime("%d/%m/%Y")
 
-    # Determinar el courier más económico
-    servicios = [
-        {"nombre": "CONNECT PLUS", "precio": precio_connect},
-        {"nombre": "UPS", "precio": precio_ups},
-        {"nombre": "FEDEX", "precio": precio_fedex},
-        {"nombre": "PRIORITY", "precio": precio_priority}
-    ]
-    servicios_ordenados = sorted(servicios, key=lambda x: x["precio"])
+    # Filtrar servicios según los checkboxes
+    todos_servicios = []
+    if ver_connect:
+        todos_servicios.append({"nombre": "CONNECT PLUS", "precio": precio_connect})
+    if ver_ups:
+        todos_servicios.append({"nombre": "UPS", "precio": precio_ups})
+    if ver_fedex:
+        todos_servicios.append({"nombre": "FEDEX", "precio": precio_fedex})
+    if ver_priority:
+        todos_servicios.append({"nombre": "PRIORITY", "precio": precio_priority})
+
+    if not todos_servicios:
+        todos_servicios.append({"nombre": "CONNECT PLUS", "precio": precio_connect})
+
+    servicios_ordenados = sorted(todos_servicios, key=lambda x: x["precio"])
     mejor_opcion = servicios_ordenados[0]
 
     # Encabezado
@@ -205,8 +254,8 @@ def generar_pdf_reportlab():
 
     # Sección 1: Datos Remitente / Destinatario
     elements.append(Paragraph("1. INFORMACIÓN DE ENVÍO", style_sec_title))
-    rem_text = f"<b>Nombre:</b> {rem_nombre}<br/><b>CUIT:</b> {rem_cuit}<br/><b>Dirección:</b> {rem_direccion}<br/><b>País:</b> {rem_pais}"
-    dest_text = f"<b>Nombre:</b> {dest_nombre}<br/><b>Dirección:</b> {dest_direccion}<br/><b>Estado/CP:</b> {dest_estado_cp}<br/><b>País:</b> {dest_pais}"
+    rem_text = f"<b>Nombre:</b> {rem_nombre}<br/><b>CUIT:</b> {rem_cuit}<br/><b>Dirección:</b> {rem_direccion}<br/><b>CP:</b> {rem_cp}<br/><b>País:</b> {rem_pais}"
+    dest_text = f"<b>Nombre:</b> {dest_nombre}<br/><b>Dirección:</b> {dest_direccion}<br/><b>Estado/CP:</b> {dest_estado} (CP: {dest_cp})<br/><b>País:</b> {dest_pais}"
     
     info_data = [
         [Paragraph("<b>REMITENTE (ORIGEN)</b>", style_cell_title), Paragraph("<b>DESTINATARIO (DESTINO)</b>", style_cell_title)],
@@ -248,7 +297,7 @@ def generar_pdf_reportlab():
     elements.append(Spacer(1, 10))
 
     # Sección 3: Comparativa de Servicios
-    elements.append(Paragraph("3. COMPARATIVA DE SERVICIOS Y COURIERS", style_sec_title))
+    elements.append(Paragraph("3. COMPARATIVA DE SERVICIOS SELECCIONADOS", style_sec_title))
     prices_data = [
         [Paragraph("Servicio / Courier", style_th), Paragraph("Precio Final (USD)", style_th), Paragraph("Estado", style_th)]
     ]
@@ -259,7 +308,7 @@ def generar_pdf_reportlab():
         estado_label = "RECOMENDADO" if es_rec else "Disponible"
         prices_data.append([
             Paragraph(s["nombre"], st_style),
-            Paragraph(f"USD {int(s['precio'])}", st_style),
+            Paragraph(f"USD {s['precio']:.2f}", st_style),
             Paragraph(estado_label, st_style)
         ])
 
@@ -275,8 +324,8 @@ def generar_pdf_reportlab():
 
     # Opción recomendada
     rec_data = [
-        [Paragraph(f"OPCIÓN MÁS CONVENIENTE: {mejor_opcion['nombre']} — USD {int(mejor_opcion['precio'])}", style_rec_title)],
-        [Paragraph(f"El servicio {mejor_opcion['nombre']} ofrece la tarifa más económica disponible para el destino seleccionado.", style_cell_text)]
+        [Paragraph(f"OPCIÓN SELECCIONADA / RECOMENDADA: {mejor_opcion['nombre']} — USD {mejor_opcion['precio']:.2f}", style_rec_title)],
+        [Paragraph(f"El servicio {mejor_opcion['nombre']} ofrece la tarifa más conveniente para la entrega en destination.", style_cell_text)]
     ]
     t_rec = Table(rec_data, colWidths=[512])
     t_rec.setStyle(TableStyle([
