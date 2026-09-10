@@ -132,7 +132,7 @@ def generar_pdf_reportlab():
     style_td = ParagraphStyle('TD', parent=styles['Normal'], fontName='Helvetica', fontSize=8.5, textColor=colors.HexColor('#2D3748'))
     style_td_rec = ParagraphStyle('TDRec', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8.5, textColor=colors.HexColor('#744210'))
     
-    style_rec_title = ParagraphStyle('RecTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#2B6CBO'))
+    style_rec_title = ParagraphStyle('RecTitle', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, textColor=colors.HexColor('#2B6CB0'))
     style_footer = ParagraphStyle('Footer', parent=styles['Normal'], fontName='Helvetica', fontSize=7.5, textColor=colors.HexColor('#718096'), alignment=1)
 
     elements = []
