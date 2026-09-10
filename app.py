@@ -96,7 +96,8 @@ with st.form("cotizacion_form"):
     with col1:
         st.subheader("Remitente (Origen)")
         rem_nombre = st.text_input("Nombre / Razón Social Remitente", value="JOSEFINA ESTRELLA")
-        rem_cuit = st.text_input("CUIT / DNI Remitente", value="27-16920864-1")
+        rem_id = st.text_input("CUIT / DNI / Tax ID Remitente", value="27-16920864-1")
+        rem_email = st.text_input("Email Remitente", value="josefina@ejemplo.com")
         rem_direccion = st.text_input("Dirección Remitente", value="Arenales 1172, CABA")
         rem_cp = st.text_input("Código Postal Origen", value="C1061AAJ")
         rem_pais = st.text_input("País Origen", value="Argentina")
@@ -104,23 +105,54 @@ with st.form("cotizacion_form"):
     with col2:
         st.subheader("Destinatario (Destino)")
         dest_nombre = st.text_input("Nombre Destinatario", value="Renata María Moreira de Jager")
+        dest_id = st.text_input("Tax ID / CUIT / ID Destinatario", value="CPF 123.456.789-00")
+        dest_email = st.text_input("Email Destinatario", value="renata@ejemplo.com")
         dest_direccion = st.text_input("Dirección / Calle Destinatario", value="Rua 30 de Novembro 739, Castro")
         
         col_cp1, col_cp2 = st.columns([2, 1])
         with col_cp1:
             dest_estado = st.text_input("Estado / Provincia", value="Paraná")
         with col_cp2:
-            dest_cp = st.text_input("Código Postal (CP)", value="84177-022", help="Escribe o verifica el código postal según la dirección.")
+            dest_cp = st.text_input("Código Postal (CP)", value="84177-022")
             
         dest_pais = st.selectbox("País Destino", options=lista_paises, index=lista_paises.index("Brasil") if "Brasil" in lista_paises else 0)
 
-    st.markdown('<div class="sub-header">2. Detalle de Carga</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">2. Detalle de Mercadería (Productos)</div>', unsafe_allow_html=True)
+    
+    num_productos = st.number_input("Cantidad de ítems / productos a declarar", min_value=1, max_value=10, value=1, step=1)
+    
+    productos = []
+    valor_declarado_total = 0.0
+
+    for i in range(int(num_productos)):
+        st.markdown(f"**Ítem #{i+1}**")
+        c_prod1, c_prod2, c_prod3, c_prod4 = st.columns([3, 2, 1.5, 1.5])
+        with c_prod1:
+            desc_p = st.text_input(f"Descripción Producto #{i+1}", value="Ovejas de Fieltro/Madera" if i==0 else "", key=f"desc_{i}")
+        with c_prod2:
+            pos_aran = st.text_input(f"Posición Arancelaria (HS Code)", value="9503.00.90" if i==0 else "", key=f"pos_{i}")
+        with c_prod3:
+            cant_p = st.number_input(f"Cantidad", min_value=1, value=3 if i==0 else 1, step=1, key=f"cant_{i}")
+        with c_prod4:
+            val_p = st.number_input(f"Valor Unit. (USD)", min_value=0.0, value=33.0 if i==0 else 0.0, step=1.0, key=f"val_{i}")
+
+        subtotal_item = cant_p * val_p
+        valor_declarado_total += subtotal_item
+        productos.append({
+            "descripcion": desc_p,
+            "posicion": pos_aran,
+            "cantidad": cant_p,
+            "valor_unitario": val_p,
+            "subtotal": subtotal_item
+        })
+
+    st.caption(f"**Valor Declarado Total Calculado:** USD {valor_declarado_total:.2f}")
+
+    st.markdown('<div class="sub-header">3. Dimensiones y Pesos del Bulto</div>', unsafe_allow_html=True)
     col3, col4, col5 = st.columns(3)
     with col3:
-        mercaderia = st.text_input("Mercadería / Descripción", value="3 Ovejas de Fieltro/Madera")
-        valor_declarado = st.number_input("Valor Declarado (USD)", value=99.0, step=1.0)
-    with col4:
         largo = st.number_input("Largo (cm)", value=10.0, step=1.0)
+    with col4:
         ancho = st.number_input("Ancho (cm)", value=36.0, step=1.0)
         alto = st.number_input("Alto (cm)", value=29.0, step=1.0)
     with col5:
@@ -135,9 +167,9 @@ with st.form("cotizacion_form"):
     st.info(f"**Cálculo Automático:** Peso Volumétrico: **{peso_vol:.3f} kg** | Peso Facturable Aplicado: **{peso_facturable} kg**")
 
     # ---------------------------------------------------------
-    # SECCIÓN 3: MARGEN DE GANANCIA Y PRECIOS DE COSTO
+    # SECCIÓN 4: MARGEN DE GANANCIA Y PRECIOS DE COSTO
     # ---------------------------------------------------------
-    st.markdown('<div class="sub-header">3. Tarifas Base (Costo) y Margen de Ganancia</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">4. Tarifas Base (Costo) y Margen de Ganancia</div>', unsafe_allow_html=True)
     
     col_m1, col_m2 = st.columns([1, 2])
     with col_m1:
@@ -169,9 +201,9 @@ with st.form("cotizacion_form"):
         st.caption(f"Precio Venta: **USD {precio_priority}**")
 
     # ---------------------------------------------------------
-    # SECCIÓN 4: SELECCIÓN DE SERVICIOS VISIBLES EN EL PDF
+    # SECCIÓN 5: SELECCIÓN DE SERVICIOS VISIBLES EN EL PDF
     # ---------------------------------------------------------
-    st.markdown('<div class="sub-header">4. Configurar Servicios Visibles en el PDF</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sub-header">5. Configurar Servicios Visibles en el PDF</div>', unsafe_allow_html=True)
     st.write("Selecciona cuáles servicios deseas mostrar en la tabla comparativa del cliente:")
     
     col_v1, col_v2, col_v3, col_v4 = st.columns(4)
@@ -254,8 +286,8 @@ def generar_pdf_reportlab():
 
     # Sección 1: Datos Remitente / Destinatario
     elements.append(Paragraph("1. INFORMACIÓN DE ENVÍO", style_sec_title))
-    rem_text = f"<b>Nombre:</b> {rem_nombre}<br/><b>CUIT:</b> {rem_cuit}<br/><b>Dirección:</b> {rem_direccion}<br/><b>CP:</b> {rem_cp}<br/><b>País:</b> {rem_pais}"
-    dest_text = f"<b>Nombre:</b> {dest_nombre}<br/><b>Dirección:</b> {dest_direccion}<br/><b>Estado/CP:</b> {dest_estado} (CP: {dest_cp})<br/><b>País:</b> {dest_pais}"
+    rem_text = f"<b>Nombre:</b> {rem_nombre}<br/><b>Tax ID/CUIT:</b> {rem_id}<br/><b>Email:</b> {rem_email}<br/><b>Dirección:</b> {rem_direccion}<br/><b>CP:</b> {rem_cp} | <b>País:</b> {rem_pais}"
+    dest_text = f"<b>Nombre:</b> {dest_nombre}<br/><b>Tax ID/ID:</b> {dest_id}<br/><b>Email:</b> {dest_email}<br/><b>Dirección:</b> {dest_direccion}<br/><b>Estado/CP:</b> {dest_estado} (CP: {dest_cp}) | <b>País:</b> {dest_pais}"
     
     info_data = [
         [Paragraph("<b>REMITENTE (ORIGEN)</b>", style_cell_title), Paragraph("<b>DESTINATARIO (DESTINO)</b>", style_cell_title)],
@@ -273,21 +305,42 @@ def generar_pdf_reportlab():
     elements.append(t_info)
     elements.append(Spacer(1, 10))
 
-    # Sección 2: Detalle de Carga
-    elements.append(Paragraph("2. DETALLE DE CARGA Y PESO FACTURABLE", style_sec_title))
+    # Sección 2: Detalle de Productos y Carga
+    elements.append(Paragraph("2. DETALLE DE MERCADERÍA Y BULTOS", style_sec_title))
+    
+    # Tabla de Productos
+    prod_table_data = [
+        [Paragraph("Descripción", style_th), Paragraph("Pos. Arancelaria", style_th), Paragraph("Cant.", style_th), Paragraph("Val. Unit. (USD)", style_th), Paragraph("Subtotal (USD)", style_th)]
+    ]
+    
+    for p in productos:
+        prod_table_data.append([
+            Paragraph(p["descripcion"], style_td),
+            Paragraph(p["posicion"], style_td),
+            Paragraph(str(p["cantidad"]), style_td),
+            Paragraph(f"{p['valor_unitario']:.2f}", style_td),
+            Paragraph(f"{p['subtotal']:.2f}", style_td)
+        ])
+
+    t_prod = Table(prod_table_data, colWidths=[180, 100, 50, 90, 92])
+    t_prod.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#1A365D')),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.HexColor('#CBD5E0')),
+        ('PADDING', (0,0), (-1,-1), 5),
+    ]))
+    elements.append(t_prod)
+    elements.append(Spacer(1, 6))
+
+    # Detalle de Pesos
     carga_data = [
         [
-            Paragraph(f"<b>Mercadería:</b> {mercaderia}", style_cell_text),
             Paragraph(f"<b>Dimensiones:</b> {int(largo)}x{int(ancho)}x{int(alto)} cm", style_cell_text),
-            Paragraph(f"<b>Valor Dec.:</b> USD {valor_declarado:.2f}", style_cell_text)
-        ],
-        [
             Paragraph(f"<b>Peso Real:</b> {peso_real:.3f} kg", style_cell_text),
-            Paragraph(f"<b>Peso Vol.:</b> {peso_vol:.3f} kg", style_cell_text),
+            Paragraph(f"<b>Peso Volumétrico:</b> {peso_vol:.3f} kg", style_cell_text),
             Paragraph(f"<b>Peso Facturable:</b> {peso_facturable} kg", style_cell_title)
         ]
     ]
-    t_carga = Table(carga_data, colWidths=[170, 170, 172])
+    t_carga = Table(carga_data, colWidths=[130, 120, 130, 132])
     t_carga.setStyle(TableStyle([
         ('BOX', (0,0), (-1,-1), 1, colors.HexColor('#E2E8F0')),
         ('PADDING', (0,0), (-1,-1), 6),
@@ -325,7 +378,7 @@ def generar_pdf_reportlab():
     # Opción recomendada
     rec_data = [
         [Paragraph(f"OPCIÓN SELECCIONADA / RECOMENDADA: {mejor_opcion['nombre']} — USD {mejor_opcion['precio']:.2f}", style_rec_title)],
-        [Paragraph(f"El servicio {mejor_opcion['nombre']} ofrece la tarifa más conveniente para la entrega en destination.", style_cell_text)]
+        [Paragraph(f"El servicio {mejor_opcion['nombre']} ofrece la tarifa más conveniente para la entrega en destino.", style_cell_text)]
     ]
     t_rec = Table(rec_data, colWidths=[512])
     t_rec.setStyle(TableStyle([
